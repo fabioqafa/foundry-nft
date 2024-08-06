@@ -8,6 +8,21 @@ import {DeployMoodNFT} from "../../script/DeployMoodNFT.s.sol";
 
 contract MoodNFTIntegrationTest is Test {
     MoodNFT moodNft;
+    event Transfer(
+        address indexed from,
+        address indexed to,
+        uint256 indexed tokenId
+    );
+    event Approval(
+        address indexed owner,
+        address indexed approved,
+        uint256 indexed tokenId
+    );
+    event ApprovalForAll(
+        address indexed owner,
+        address indexed operator,
+        bool approved
+    );
     string public constant HAPPY_SVG_TOKEN_URI =
         "data:application/json;base64,eyJuYW1lIjoiTW9vZCBORlQiLCAiZGVzY3JpcHRpb24iOiJBbiBORlQgdGhhdCByZWZsZWN0cyB0aGUgb3duZXJzIG1vb2QuIiwgImF0dHJpYnV0ZXMiOiBbeyJ0cmFpdF90eXBlIjogIm1vb2RpbmVzcyIsICJ2YWx1ZSI6IDEwMH1dLCAiaW1hZ2UiOiJkYXRhOmltYWdlL3N2Zyt4bWw7YmFzZTY0LFBITjJaeUIyYVdWM1FtOTRQU0l3SURBZ01qQXdJREl3TUNJZ2QybGtkR2c5SWpRd01DSWdhR1ZwWjJoMFBTSTBNREFpSUhodGJHNXpQU0pvZEhSd09pOHZkM2QzTG5jekxtOXlaeTh5TURBd0wzTjJaeUkrQ2lBZ0lDQThZMmx5WTJ4bElHTjRQU0l4TURBaUlHTjVQU0l4TURBaUlHWnBiR3c5SW5sbGJHeHZkeUlnY2owaU56Z2lJSE4wY205clpUMGlZbXhoWTJzaUlITjBjbTlyWlMxM2FXUjBhRDBpTXlJZ0x6NEtJQ0FnSUR4bklHTnNZWE56UFNKbGVXVnpJajRLSUNBZ0lDQWdJQ0E4WTJseVkyeGxJR040UFNJM01DSWdZM2s5SWpneUlpQnlQU0l4TWlJZ0x6NEtJQ0FnSUNBZ0lDQThZMmx5WTJ4bElHTjRQU0l4TWpjaUlHTjVQU0k0TWlJZ2NqMGlNVElpSUM4K0NpQWdJQ0E4TDJjK0NpQWdJQ0E4Y0dGMGFDQmtQU0p0TVRNMkxqZ3hJREV4Tmk0MU0yTXVOamtnTWpZdU1UY3ROalF1TVRFZ05ESXRPREV1TlRJdExqY3pJaUJ6ZEhsc1pUMGlabWxzYkRwdWIyNWxPeUJ6ZEhKdmEyVTZJR0pzWVdOck95QnpkSEp2YTJVdGQybGtkR2c2SURNN0lpQXZQZ284TDNOMlp6ND0ifQ==";
 
@@ -19,6 +34,117 @@ contract MoodNFTIntegrationTest is Test {
     function setUp() public {
         deployer = new DeployMoodNFT();
         moodNft = deployer.run();
+    }
+
+    function testName() public view {
+        bytes32 expectedName = keccak256(abi.encodePacked("Mood NFT"));
+        bytes32 actualName = keccak256(abi.encodePacked(moodNft.name()));
+
+        assert(expectedName == actualName);
+    }
+
+    function testSymbol() public view {
+        bytes32 expectedSymbol = keccak256(abi.encodePacked("MN"));
+        bytes32 actualSymbol = keccak256(abi.encodePacked(moodNft.symbol()));
+
+        assert(expectedSymbol == actualSymbol);
+    }
+
+    function testMint() public {
+        vm.prank(USER);
+
+        moodNft.mintNFT();
+
+        assert(moodNft.balanceOf(USER) == 1);
+    }
+
+    function testSafeTransferFrom() public {
+        vm.prank(msg.sender);
+        moodNft.mintNFT();
+
+        vm.prank(msg.sender);
+        moodNft.safeTransferFrom(msg.sender, USER, 0);
+
+        assertEq(moodNft.ownerOf(0), USER);
+    }
+
+    function testFailSafeTransferFromNotOwner() public {
+        address owner = msg.sender;
+        vm.prank(owner);
+        moodNft.mintNFT();
+        vm.prank(USER);
+        moodNft.safeTransferFrom(owner, USER, 0);
+    }
+
+    function testSafeTransferFromRevert() public {
+        vm.prank(msg.sender);
+        vm.expectRevert();
+        moodNft.safeTransferFrom(msg.sender, USER, 0);
+    }
+
+    function testApprove() public {
+        vm.prank(msg.sender);
+        moodNft.mintNFT();
+
+        vm.prank(msg.sender);
+        moodNft.approve(USER, 0);
+        assertEq(moodNft.getApproved(0), USER);
+    }
+
+    function testApproveRevert() public {
+        vm.prank(msg.sender);
+        moodNft.mintNFT();
+
+        vm.prank(USER);
+        vm.expectRevert();
+        moodNft.approve(USER, 0);
+    }
+
+    function testSetApprovalForAll() public {
+        vm.prank(msg.sender);
+        moodNft.setApprovalForAll(USER, true);
+
+        assertTrue(moodNft.isApprovedForAll(msg.sender, USER));
+
+        vm.prank(msg.sender);
+        moodNft.setApprovalForAll(USER, false);
+
+        assertFalse(moodNft.isApprovedForAll(msg.sender, USER));
+    }
+
+    function testBalanceOf() public {
+        vm.prank(msg.sender);
+        moodNft.mintNFT();
+        vm.prank(msg.sender);
+        moodNft.mintNFT();
+        assertEq(moodNft.balanceOf(msg.sender), 2);
+    }
+
+    function testEmitTransferEvent() public {
+        vm.prank(msg.sender);
+        moodNft.mintNFT();
+        vm.expectEmit(true, true, true, true);
+        emit Transfer(msg.sender, USER, 0);
+
+        vm.prank(msg.sender);
+        moodNft.transferFrom(msg.sender, USER, 0);
+    }
+
+    function testEmitApprovalEvent() public {
+        vm.prank(msg.sender);
+        moodNft.mintNFT();
+        vm.expectEmit(true, true, true, true);
+        emit Approval(msg.sender, USER, 0);
+
+        vm.prank(msg.sender);
+        moodNft.approve(USER, 0);
+    }
+
+    function testEmitApprovalForAllEvent() public {
+        vm.expectEmit(true, true, true, true);
+        emit ApprovalForAll(msg.sender, USER, true);
+        vm.prank(msg.sender);
+        moodNft.setApprovalForAll(USER, true);
     }
 
     function testTokenURI() public {

@@ -16,6 +16,7 @@ contract MintMoodNFT is Script {
             block.chainid
         );
         mintMoodNftOnContract(mostRecentlyDeployed);
+        flipMoodNftOnContracts(mostRecentlyDeployed, 0);
     }
 
     function mintMoodNftOnContract(address contractAddress) public {
